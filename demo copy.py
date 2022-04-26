@@ -1,9 +1,4 @@
-# select 없는버전
-
-# a4 용지가 전체적으로 나오게 찍었을때 contour 잡는 과정이 두번 필요함
-# img1.jpeg는 아래 책상에 반사된 빛 때문에 에이포가 잘 안잡힘
-# img2.jpeg는 에이포 꼭짓점 부분이 짤려서 안잡힘
-
+## select 있는버전
 
 from transform import transform
 from skimage.filters import threshold_local
@@ -18,73 +13,133 @@ import cv2
 import time
 # from roi import select
 
-imgPath = "img3.jpeg"
+imgPath = "img2.jpeg"
 src = cv2.imread(imgPath)
 h, w, c = src.shape
-# if h > 1000 or w > 1000:
-#     src = cv2.resize(src, (w//2, h//2), interpolation=cv2.INTER_AREA)
+if h > 1000 or w > 1000:
+    src = cv2.resize(src, (w//2, h//2), interpolation=cv2.INTER_AREA)
 if src is None:
     print('Image open failed!')
     sys.exit()
 
-def draw_square(input_img, d=1):
-    orig = input_img.copy()
-    gray = cv2.cvtColor(orig, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # detecting edges
-    edge = cv2.Canny(blur, 75, 200)
-    if d == 1:
-        cv2.imwrite('draw_square1.png', edge)
-    kernel = np.ones((d,d), np.uint8)  # kernel값에 따라 범용 불가할 수도 있음 --- 해결필요
-    dilate = cv2.dilate(edge, kernel, iterations=1)
-    cv2.imwrite('check.png', edge)
-    # finding contours
-    contours, hierarchy = cv2.findContours(dilate.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    contours = sorted(contours, key = cv2.contourArea, reverse = True)[:5]
+def drawROI(img, corners):
+    cpy = img.copy()
 
-    for contour in contours:
-        
-        perimeter = cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, 0.02 * perimeter, True)
-        
-        if len(approx) == 4:
-            document = approx
+    c1 = (192, 192, 255)
+    c2 = (128, 128, 255)
+
+    for pt in corners:
+        cv2.circle(cpy, tuple(pt.astype(int)), 50, c1, -1, cv2.LINE_AA)
+
+    cv2.line(cpy, tuple(corners[0].astype(int)), tuple(corners[1].astype(int)), c2, 2, cv2.LINE_AA)
+    cv2.line(cpy, tuple(corners[1].astype(int)), tuple(corners[2].astype(int)), c2, 2, cv2.LINE_AA)
+    cv2.line(cpy, tuple(corners[2].astype(int)), tuple(corners[3].astype(int)), c2, 2, cv2.LINE_AA)
+    cv2.line(cpy, tuple(corners[3].astype(int)), tuple(corners[0].astype(int)), c2, 2, cv2.LINE_AA)
+
+    disp = cv2.addWeighted(img, 0.3, cpy, 0.7, 0)
+
+    return disp
+
+
+def onMouse(event, x, y, flags, param):
+    global srcQuad, dragSrc, ptOld, src
+
+    if event == cv2.EVENT_LBUTTONDOWN:
+        for i in range(4):
+            if cv2.norm(srcQuad[i] - (x, y)) < 25:
+                dragSrc[i] = True
+                ptOld = (x, y)
+                break
+
+    if event == cv2.EVENT_LBUTTONUP:
+        for i in range(4):
+            dragSrc[i] = False
+
+    if event == cv2.EVENT_MOUSEMOVE:
+        for i in range(4):
+            if dragSrc[i]:
+                dx = x - ptOld[0]
+                dy = y - ptOld[1]
+
+                srcQuad[i] += (dx, dy)
+
+                cpy = drawROI(src, srcQuad)
+                # cv2.imshow('img', cpy)
+                ptOld = (x, y)
+                break
+
+def select():
+    global srcQuad, dragSrc, ptOld, src
+    # 입력 영상 크기 및 출력 영상 크기
+    h, w = src.shape[:2]
+    dw = 500
+    dh = round(dw * 297 / 210)  # A4 용지 크기: 210x297cm
+
+    # 모서리 점들의 좌표, 드래그 상태 여부
+    srcQuad = np.array([[70, 70], [70, h-70], [w-70, h-70], [w-70, 70]], np.float32)
+    dstQuad = np.array([[0, 0], [0, dh-1], [dw-1, dh-1], [dw-1, 0]], np.float32)
+    dragSrc = [False, False, False, False]
+
+    # 모서리점, 사각형 그리기
+    disp = drawROI(src, srcQuad)
+
+    # cv2.imshow('img', disp)
+    cv2.setMouseCallback('img', onMouse)
+
+    while True:
+        key = cv2.waitKey()
+        if key == 13:  # ENTER 키
+            cv2.destroyWindow('img')
             break
-    warped = transform(orig, document.reshape(4, 2))
-    outlined = cv2.drawContours(orig, [document], -1, (0, 255, 0), 2)
+        elif key == 27:  # ESC 키
+            cv2.destroyWindow('img')
+            sys.exit()
+
+    # 투시 변환
+    pers = cv2.getPerspectiveTransform(srcQuad, dstQuad)
+    dst = cv2.warpPerspective(src, pers, (dw, dh), flags=cv2.INTER_CUBIC)
+    return dst
+
+
+orig = src.copy()
+
+gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+blur = cv2.GaussianBlur(gray, (5, 5), 0)
+
+# detecting edges
+edge = cv2.Canny(blur, 75, 200)
+
+# finding contours
+contours, hierarchy = cv2.findContours(edge.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+contours = sorted(contours, key = cv2.contourArea, reverse = True)[:5]
+
+for contour in contours:
     
-    # warped_gray = cv2.cvtColor(warped, cv2q.COLOR_BGR2GRAY)
-    return outlined, warped  # contour한 결과를 출력
+	perimeter = cv2.arcLength(contour, True)
+	approx = cv2.approxPolyDP(contour, 0.02 * perimeter, True)
+	
+	if len(approx) == 4:
+		document = approx
+		break
 
-# a4용지 검출
+if len(approx) == 4:
+    cv2.drawContours(src, [document], -1, (0, 255, 0), 2)
+    cv2.imshow("Outline", src)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    warped = transform(orig, document.reshape(4, 2))
+else :
+    warped = select()
+    
+warped_g = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
 
+cv2.imwrite('warped_g.png', warped_g)
 
-a4_outlined, a4_warped = draw_square(src, 3)
-
-cv2.imshow('a4_outlined', a4_outlined)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-# cv2.imshow('a4_warped', a4_warped)
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
-
-
-# a4_warped = a4_warped[10:-10,10:-10,:]
-# 그 안 미로 검출
-maze_outlined, maze_warped = draw_square(a4_warped, 10)
-cv2.imshow('maze_outlined', maze_outlined)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-cv2.imshow('maze_warped', maze_warped)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
-# cv2.imwrite('warped_g.png', warped_g)
-maze_warped_gray = cv2.cvtColor(maze_warped, cv2.COLOR_BGR2GRAY)
 # calculate a threshold mask
-T = threshold_local(maze_warped_gray, 11, offset = 10, method = "gaussian")
-result = (maze_warped_gray<= T).astype("uint8") * 255
+T = threshold_local(warped_g, 11, offset = 10, method = "gaussian")
+result = (warped_g <= T).astype("uint8") * 255
+
 
 # ret, result = cv2.threshold(warped_g,150,255, cv2.THRESH_BINARY_INV)
 img = cv2.cvtColor(255-result, cv2.COLOR_GRAY2BGR)
@@ -151,7 +206,7 @@ def maze_solver(dila, start_point, end_point):
                 for ix, iy, jx, jy in branch[1:]:
                     if temx == jx and temy == jy and map[temx][temy] - map[ix][iy] >0:
                         temx, temy = ix, iy
-                        cv2.circle(img, (iy, ix), 2, (0, 0, 255), thickness = 1)          
+                        cv2.circle(img, (iy, ix), 2, (0, 0, 255), thickness = 2)          
 
                 cv2.imwrite('res.png', img)
                 
@@ -190,14 +245,16 @@ def MouseLeftClick(event, x, y, flags, param):
             maze_solver(img_erased, points[0], points[1])
     cv2.imshow("image", img)
 
-
 cv2.namedWindow('image')
 img_erased = erase_outside(dilate)
 cv2.imshow('image', img)
 cv2.setMouseCallback('image', MouseLeftClick)
 
 
+
+
 while True:
     if cv2.waitKey(0) == ord('q'):
         break
+cv2.destroyAllWindows()
 
