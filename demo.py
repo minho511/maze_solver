@@ -134,6 +134,8 @@ def maze_solver(dila, start_point, end_point):
 
     q = deque([(startx, starty)])
     branch = []
+
+    cnt = 0
     while q:
 
         x, y = q.popleft()
@@ -152,9 +154,11 @@ def maze_solver(dila, start_point, end_point):
                     if temx == jx and temy == jy and map[temx][temy] - map[ix][iy] >0:
                         temx, temy = ix, iy
                         cv2.circle(img, (iy, ix), 2, (0, 0, 255), thickness = 1)          
-
+                        cnt += 1
+                        if cnt%50 == 0:
+                            cv2.imwrite(f'./gifs/img{cnt}.png', img)
                 cv2.imwrite('res.png', img)
-                
+
                 return
             if dila[nx][ny] != 0:
                 continue
