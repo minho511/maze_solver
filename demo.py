@@ -18,7 +18,7 @@ import cv2
 import time
 # from roi import select
 
-imgPath = "img3.jpeg"
+imgPath = "./imgs/data/f/"
 src = cv2.imread(imgPath)
 h, w, c = src.shape
 # if h > 1000 or w > 1000:
