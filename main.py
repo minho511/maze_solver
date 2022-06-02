@@ -8,9 +8,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
 import cv2
+from make_gif import mkgif
 
-
-imgPath = "./dataset/d/maze2.png"
+imgPath = "./dataset/l/maze2.png"
 img = cv2.imread(imgPath)
 
 def sq_detect(image):
@@ -21,7 +21,6 @@ def sq_detect(image):
     # dilate 하지 않으면 미로를 인식하지 못함
     kernel = np.ones((10,10), np.uint8)
     dilate = cv2.dilate(edge, kernel, iterations=1)
-    cv2.imwrite('d.png', dilate)
     contours, hierarchy = cv2.findContours(dilate.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key = cv2.contourArea, reverse = True)[:5]
 
@@ -172,6 +171,8 @@ def maze_solver(dila, start_point, end_point, maze_warp):
                         cv2.imwrite(f'./gifs/img{cnt}.png', labeled)
                 cv2.imshow('res', labeled)
                 cv2.waitKey(0)
+                cv2.destroyAllWindows()
+                mkgif()
                 return
             if dila[nx][ny] != 0:
                 continue
@@ -219,9 +220,6 @@ def erase_outside(image):
     return img
 
 maze_result = erase_outside(maze_bin)
-cv2.imshow(maze_result)
-cv2.waitkey(0)
-cv2.destroyAllWindows
 maze_solver(maze_result, start, end, maze_warp)
 
 
