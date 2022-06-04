@@ -10,7 +10,7 @@ from collections import deque
 import cv2
 from make_gif import mkgif
 # mimi
-imgPath = "./dataset/l/maze2.png"
+imgPath = "./dataset/l/maze1.png"
 img = cv2.imread(imgPath)
 
 def sq_detect(image):
@@ -103,9 +103,22 @@ def find_point(image):
     rmap3 = cv2.erode(rmap2, kernel, iterations=1)
     gmap = (hsv[:,:,0]>50) * (hsv[:,:,0]<70)
     gmap2 = hsv[:,:,1]>180
-    start = np.where(gmap2*gmap == 1)
-    end = np.where(rmap3*rmap == 1)
-    
+    # start = np.where(gmap2*gmap == 1)
+    # end = np.where(rmap3*rmap == 1)
+    plt.subplot(2, 6, 1)
+    plt.imshow(rmap, cmap='gray')
+    plt.subplot(2, 6, 2)
+    plt.imshow(rmap2, cmap='gray')
+    plt.subplot(2, 6, 3)
+    plt.imshow(rmap*rmap2, cmap='gray')
+    plt.subplot(2, 6, 4)
+    plt.imshow(gmap, cmap='gray')
+    plt.subplot(2, 6, 5)
+    plt.imshow(gmap2, cmap='gray')
+    plt.subplot(2, 6, 6)
+    plt.imshow(gmap*gmap2, cmap='gray')
+    plt.show()
+    exit()
     # 영역의 중앙 점 좌표를 사용
     startX = np.median(start[0])
     startY = np.median(start[1])
