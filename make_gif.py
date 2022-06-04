@@ -13,5 +13,3 @@ def mkgif():
     paths = [ Image.open(i) for i in path]
     print(len(paths))
     imageio.mimsave('./result.gif', paths, fps=20)
-    img = Image.open('./result.gif')
-    img.show()
