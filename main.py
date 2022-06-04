@@ -10,7 +10,7 @@ from collections import deque
 import cv2
 from make_gif import mkgif
 
-imgPath = "./dataset/l/maze2.png"
+imgPath = "./dataset/d/maze4.png"
 img = cv2.imread(imgPath)
 
 def sq_detect(image):
@@ -89,6 +89,50 @@ cv2.destroyAllWindows()
 #     cv2.destroyAllWindows()
 # hough_line_detect(maze_warp)
 
+def find_widest_region(mat):
+    '''
+    이진 영상에서 가장 큰 영역의 위치를 반환
+    이때 배경은 0 영역은 1
+    '''
+    map = mat.copy()
+    map = map.astype(np.uint8)
+    
+    h, w = mat.shape
+    dx = [-1, 1, 0, 0]
+    dy = [0, 0, 1, -1]
+    region = 2
+    
+    for x in range(h):
+        for y in range(w):
+            if map[x][y] == 1:
+                
+                q = deque([(x, y)])
+                map[x][y] = region
+                while q:
+                    cx, cy = q.popleft()
+                    print(cx, cy)
+                    map[cx][cy] = region
+                    for k in range(4):
+                        nx = cx + dx[k]
+                        ny = cy + dy[k] 
+                        if nx < 0 or ny < 0 or nx >=h or ny >=w:
+                            continue
+                        if map[nx][ny] == 0 or map[nx][ny] == region:
+                            continue
+                        if map[nx][ny] == 1:
+                            q.append((nx, ny))
+                            map[nx][ny] = region
+                region += 1
+    points = []
+    size_of_region = []
+    for r in range(2,region):
+        p =np.where(map==r)
+        points.append(p)
+        size_of_region.append(len(p[0]))
+    print(size_of_region)
+    return points[np.argmax(size_of_region)]
+
+
 def find_point(image):
     '''
     이미지에서 출발점 (초록점), 도착점 (빨간점)의 위치를 출력
@@ -97,15 +141,21 @@ def find_point(image):
     '''
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     rmap = hsv[:,:,0]<10
-    rmap2 = np.array(hsv[:,:,1]>180)
-    rmap2 = rmap2.astype(np.uint8)
-    kernel = np.ones((3,3))
-    rmap3 = cv2.erode(rmap2, kernel, iterations=1)
+    rmap2 = hsv[:,:,1]>130
+    # rmap2 = rmap2.astype(np.uint8)
+
     gmap = (hsv[:,:,0]>50) * (hsv[:,:,0]<70)
-    gmap2 = hsv[:,:,1]>180
-    start = np.where(gmap2*gmap == 1)
-    end = np.where(rmap3*rmap == 1)
+    gmap2 = hsv[:,:,1]>130
     
+    plt.imsave('ramp.png', rmap2*rmap)
+    plt.imsave('gmap.png', gmap2*gmap)
+    # exit()
+    # start = np.where(gmap2*gmap == 1)
+    # end = np.where(rmap3*rmap == 1)
+    start = find_widest_region(rmap2*rmap)
+    end = find_widest_region(gmap2*gmap)
+
+    # 가장 큰 영역
     # 영역의 중앙 점 좌표를 사용
     startX = np.median(start[0])
     startY = np.median(start[1])
