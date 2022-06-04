@@ -3,21 +3,17 @@ from skimage.filters import threshold_local
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-import sys
-import numpy as np
-import matplotlib.pyplot as plt
 from collections import deque
-import cv2
 from make_gif import mkgif
 
-imgPath = "./dataset/d/maze4.png"
+imgPath = "./dataset/d/maze1.png"
 img = cv2.imread(imgPath)
 
 def sq_detect(image):
     origin = image.copy()
     gray = cv2.cvtColor(origin, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    edge = cv2.Canny(blur, 75, 200)
+    # blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    edge = cv2.Canny(gray, 75, 200)
     # dilate 하지 않으면 미로를 인식하지 못함
     kernel = np.ones((10,10), np.uint8)
     dilate = cv2.dilate(edge, kernel, iterations=1)
@@ -39,7 +35,9 @@ def sq_detect(image):
 
 a4_contour, a4_warp = sq_detect(img)
 # 에이포 용지의 윤곽선이 남기도 하여 잘라냄
-a4_warp = a4_warp[20:-20,20:-20,:]
+def cut_edge(image):
+    return image[20:-20,20:-20,:]
+a4_warp = cut_edge(a4_warp)
 maze_contour, maze_warp = sq_detect(a4_warp)
 cv2.imshow('a4_contour', a4_contour)
 cv2.waitKey(0)
@@ -141,11 +139,11 @@ def find_point(image):
     '''
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     rmap = hsv[:,:,0]<10
-    rmap2 = hsv[:,:,1]>130
+    rmap2 = hsv[:,:,1]>120
     # rmap2 = rmap2.astype(np.uint8)
 
-    gmap = (hsv[:,:,0]>50) * (hsv[:,:,0]<70)
-    gmap2 = hsv[:,:,1]>130
+    gmap = (hsv[:,:,0]>40) * (hsv[:,:,0]<80)
+    gmap2 = hsv[:,:,1]>100
     
     plt.imsave('ramp.png', rmap2*rmap)
     plt.imsave('gmap.png', gmap2*gmap)
@@ -169,16 +167,15 @@ def find_point(image):
     cv2.circle(img_erased, (int(endY),int(endX)), 2, (255,255,255), thickness = 10)
     return (int(startX), int(startY)), (int(endX), int(endY)), img_erased
 
-start, end, img_erased = find_point(maze_warp)
+start, end, maze_erased = find_point(maze_warp)
 
 # 미로 사진을 이진화 한다.
-maze_gray = cv2.cvtColor(img_erased, cv2.COLOR_BGR2GRAY)
-T = threshold_local(maze_gray, 11, offset = 10, method = "gaussian")
-maze_bin = (maze_gray<= T).astype("uint8")*255
+def binary_inv(maze_erased):
+    maze_gray = cv2.cvtColor(maze_erased, cv2.COLOR_BGR2GRAY)
+    T = threshold_local(maze_gray, 11, offset = 10, method = "gaussian")
+    maze_bin = (maze_gray<= T).astype("uint8")*255
+    return maze_bin
 
-# 미로 길찾기
-points = []
-cnt = 0
 
 
 def maze_solver(dila, start_point, end_point, maze_warp):
@@ -232,7 +229,6 @@ def maze_solver(dila, start_point, end_point, maze_warp):
                 map[nx][ny] = map[x][y] + 1
                 branch.append((x, y, nx, ny))
 
-    return
 def erase_outside(image):
     '''
     길을 밖으로 찾지 않도록 최외각선 밖의 영역을 막아줘야됨
@@ -269,6 +265,8 @@ def erase_outside(image):
         rd[1] -= 1
     return img
 
+# 미로 길찾기
+maze_bin = binary_inv(maze_erased)
 maze_result = erase_outside(maze_bin)
 maze_solver(maze_result, start, end, maze_warp)
 
