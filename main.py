@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from collections import deque
 import cv2
 from make_gif import mkgif
-
+# mimi
 imgPath = "./dataset/l/maze2.png"
 img = cv2.imread(imgPath)
 
