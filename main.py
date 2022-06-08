@@ -1,42 +1,82 @@
-from transform import transform
 from skimage.filters import threshold_local
 import numpy as np
 import cv2
+import os
+import imageio
+from PIL import Image
 import matplotlib.pyplot as plt
 from collections import deque
-from make_gif import mkgif
+import time 
 
-imgPath = "./dataset/d/maze1.png"
+imgPath = "./dataset/d/mazed1.png"
 img = cv2.imread(imgPath)
+
+def order_points(pts):
+
+    rect = np.zeros((4, 2), dtype = "float32")
+
+    s= np.sum(pts, axis = 1)
+    rect[0] = pts[np.argmin(s)]
+    rect[2] = pts[np.argmax(s)]
+    
+    d = np.diff(pts, axis = 1)
+    rect[1] = pts[np.argmin(d)]
+    rect[3] = pts[np.argmax(d)]
+    
+    return rect
+    
+def transform(img, pts):
+    
+    rect = order_points(pts)
+    (tl, tr, br, bl) = rect	
+    
+    width_1 = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))	
+    width_2 = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+    maxWidth = max(int(width_1), int(width_2))
+    
+    height_1 = np.sqrt(((br[0] - tr[0]) ** 2) + ((br[1] - tr[1]) ** 2))	
+    height_2 = np.sqrt(((bl[0] - tl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+    maxHeight = max(int(height_1), int(height_2))
+    
+    dst = np.array([
+             [0, 0],
+             [maxWidth - 1, 0],
+             [maxWidth - 1, maxHeight - 1],
+             [0, maxHeight - 1]], dtype = "float32")
+             
+    M = cv2.getPerspectiveTransform(rect, dst) 
+    warped = cv2.warpPerspective(img, M, (maxWidth, maxHeight))
+    return warped
 
 def sq_detect(image):
     origin = image.copy()
-    gray = cv2.cvtColor(origin, cv2.COLOR_BGR2GRAY)
-    # blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    edge = cv2.Canny(gray, 75, 200)
-    # dilate 하지 않으면 미로를 인식하지 못함
+    gray = cv2.cvtColor(origin, cv2.COLOR_BGR2GRAY) # gray scale로 변환
+    edge = cv2.Canny(gray, 75, 200) # Canny edge 적용하여 edge를 검출함
     kernel = np.ones((10,10), np.uint8)
-    dilate = cv2.dilate(edge, kernel, iterations=1)
+    dilate = cv2.dilate(edge, kernel, iterations=1) # 없으면 미로검출 안됨
+    # contour를 검출
     contours, hierarchy = cv2.findContours(dilate.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key = cv2.contourArea, reverse = True)[:5]
-
+    # 미로의 입구와 출구로 인한 왜곡과 A4용지의 구부러짐또는 빛에 의한 정보손실을 고려하여 approxPolyDP 사용
     for contour in contours:
-        
         perimeter = cv2.arcLength(contour, True)
         approx = cv2.approxPolyDP(contour, 0.02 * perimeter, True)
-        
-        if len(approx) == 4:
+        if len(approx) == 4: # 4개의 윤곽을 찾았다면 종료
             document = approx
             break
-    warp = transform(origin, document.reshape(4, 2))
-    contour = cv2.drawContours(origin, [document], -1, (0, 255, 0), 2)
+    # 윤곽선의 정보를 기준으로
+    warped_image = transform(origin, document.reshape(4, 2))
+    # 기존의 이미지에 검출한 윤곽을 그림
+    contour_image = cv2.drawContours(origin, [document], -1, (0, 255, 0), 2) 
     
-    return contour, warp  # contour한 결과를 출력
+    return contour_image, warped_image  # contour한 결과를 출력
 
 a4_contour, a4_warp = sq_detect(img)
+
 # 에이포 용지의 윤곽선이 남기도 하여 잘라냄
 def cut_edge(image):
     return image[20:-20,20:-20,:]
+
 a4_warp = cut_edge(a4_warp)
 maze_contour, maze_warp = sq_detect(a4_warp)
 cv2.imshow('a4_contour', a4_contour)
@@ -51,45 +91,10 @@ cv2.destroyAllWindows()
 cv2.imshow('maze_warp', maze_warp)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
-# cv2.imshow('hough line', maze_warp)
-# cv2.waitKey()
-# cv2.destroyAllWindows()
-
-# 허프변환으로는 미로 벽의 정보를 잃는다.
-# def hough_line_detect(image):
-#     img = image.copy()
-#     h, w, _ = img.shape
-#     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-#     edge = cv2.Canny(gray, 50, 150)
-#     kernel = np.ones((7, 7), np.uint8)
-#     # dilate = cv2.dilate(edge, kernel, iterations=1)
-#     # erode = cv2.erode(dilate, kernel, iterations=1)
-#     cv2.imshow('hough line', edge)
-#     cv2.waitKey()
-#     cv2.destroyAllWindows()
-#     lines = cv2.HoughLines(edge, 1, np.pi/180, 150)
-#     for line in lines: # 검출된 모든 선 순회
-#         r,theta = line[0] # 거리와 각도
-#         tx, ty = np.cos(theta), np.sin(theta) # x, y축에 대한 삼각비
-#         x0, y0 = tx*r, ty*r  #x, y 기준(절편) 좌표
-#         # 기준 좌표에 빨강색 점 그리기
-#         # cv2.circle(img, int(x0), int(y0), 3, (0,0,255), -1)
-#         # 직선 방정식으로 그리기 위한 시작점, 끝점 계산
-#         x1, y1 = int(x0 + w*(-ty)), int(y0 + h * tx)
-#         x2, y2 = int(x0 - w*(-ty)), int(y0 - h * tx)
-#         # 선그리기
-#         cv2.line(img, (x1, y1), (x2, y2), (0,255,0), 1)
-
-#     #결과 출력    
-#     merged = np.hstack((image, img))
-#     cv2.imshow('hough line', merged)
-#     cv2.waitKey()
-#     cv2.destroyAllWindows()
-# hough_line_detect(maze_warp)
 
 def find_widest_region(mat):
     '''
-    이진 영상에서 가장 큰 영역의 위치를 반환
+    이진 영상에서 가장 큰 영역에 속하는 좌표값들을 반환
     이때 배경은 0 영역은 1
     '''
     map = mat.copy()
@@ -108,7 +113,6 @@ def find_widest_region(mat):
                 map[x][y] = region
                 while q:
                     cx, cy = q.popleft()
-                    print(cx, cy)
                     map[cx][cy] = region
                     for k in range(4):
                         nx = cx + dx[k]
@@ -127,7 +131,6 @@ def find_widest_region(mat):
         p =np.where(map==r)
         points.append(p)
         size_of_region.append(len(p[0]))
-    print(size_of_region)
     return points[np.argmax(size_of_region)]
 
 
@@ -140,16 +143,10 @@ def find_point(image):
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     rmap = hsv[:,:,0]<10
     rmap2 = hsv[:,:,1]>120
-    # rmap2 = rmap2.astype(np.uint8)
 
     gmap = (hsv[:,:,0]>40) * (hsv[:,:,0]<80)
-    gmap2 = hsv[:,:,1]>100
-    
-    plt.imsave('ramp.png', rmap2*rmap)
-    plt.imsave('gmap.png', gmap2*gmap)
-    # exit()
-    # start = np.where(gmap2*gmap == 1)
-    # end = np.where(rmap3*rmap == 1)
+    gmap2 = hsv[:,:,1]>80
+
     start = find_widest_region(rmap2*rmap)
     end = find_widest_region(gmap2*gmap)
 
@@ -163,8 +160,8 @@ def find_point(image):
     # 추가로 미로에서 출발 도착 지점에 해당하는 부분은 통로로 만들어줘야하기 때문에
     # end와 start에 담긴 좌표를 사용하여 image의 출발 도착 지점을 255로 만들어줌
     img_erased = image.copy()
-    cv2.circle(img_erased, (int(startY),int(startX)), 2, (255,255,255), thickness = 10)
-    cv2.circle(img_erased, (int(endY),int(endX)), 2, (255,255,255), thickness = 10)
+    cv2.circle(img_erased, (int(startY),int(startX)), 2, (255,255,255), thickness = 15)
+    cv2.circle(img_erased, (int(endY),int(endX)), 2, (255,255,255), thickness = 15)
     return (int(startX), int(startY)), (int(endX), int(endY)), img_erased
 
 start, end, maze_erased = find_point(maze_warp)
@@ -176,9 +173,17 @@ def binary_inv(maze_erased):
     maze_bin = (maze_gray<= T).astype("uint8")*255
     return maze_bin
 
-
+def mkgif():
+    path = [f"./for_mkgif/{i}" for i in os.listdir("./for_mkgif")]
+    for idx, p in enumerate(path):
+        if p[-4:] != '.png':
+            path.pop(idx)
+    path.sort()
+    paths = [ Image.open(i) for i in path]
+    imageio.mimsave('./result.gif', paths, fps=20)
 
 def maze_solver(dila, start_point, end_point, maze_warp):
+    t = time.time()
     map = np.zeros_like(dila, np.float32)
     startx, starty = start_point
     endx, endy = end_point
@@ -190,7 +195,9 @@ def maze_solver(dila, start_point, end_point, maze_warp):
 
     q = deque([(startx, starty)])
     branch = []
-    
+    # gif 파일을 만들기위해 경로를 저장할 폴더를 만든다.
+    if not os.path.isdir('./for_mkgif'):
+        os.mkdir('./for_mkgif')
     cnt = 0
     while q:
         x, y = q.popleft()
@@ -202,6 +209,7 @@ def maze_solver(dila, start_point, end_point, maze_warp):
                 continue
             if nx == endx and ny == endy:
                 print('finish!')
+                print(time.time()-t)
                 branch.reverse()
                 temx, temy, _, _ = branch[0]
                 road = []
@@ -215,7 +223,7 @@ def maze_solver(dila, start_point, end_point, maze_warp):
                     cv2.circle(labeled, (ix, iy), 2, (0, 0, 255), thickness = 1)          
                     cnt += 1
                     if cnt%30 == 0:
-                        cv2.imwrite(f'./gifs/img{cnt}.png', labeled)
+                        cv2.imwrite(f'./for_mkgif/img{cnt}.png', labeled)
                 cv2.imshow('res', labeled)
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
@@ -229,10 +237,11 @@ def maze_solver(dila, start_point, end_point, maze_warp):
                 map[nx][ny] = map[x][y] + 1
                 branch.append((x, y, nx, ny))
 
-def erase_outside(image):
+def block_outside(image):
     '''
     길을 밖으로 찾지 않도록 최외각선 밖의 영역을 막아줘야됨
     '''
+    
     img = image.copy()
     h, w = image.shape
     lu = [0,0]
@@ -267,7 +276,7 @@ def erase_outside(image):
 
 # 미로 길찾기
 maze_bin = binary_inv(maze_erased)
-maze_result = erase_outside(maze_bin)
-maze_solver(maze_result, start, end, maze_warp)
+maze_in = block_outside(maze_bin)
+maze_solver(maze_in, start, end, maze_warp)
 
 
