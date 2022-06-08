@@ -143,7 +143,7 @@ def find_point(image):
     '''
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     rmap = hsv[:,:,0]<10
-    rmap2 = hsv[:,:,1]>120
+    rmap2 = hsv[:,:,1]>100
 
     gmap = (hsv[:,:,0]>40) * (hsv[:,:,0]<80)
     gmap2 = hsv[:,:,1]>80
