@@ -1,5 +1,5 @@
 # maze_solver
-
+2022.06.10
 ___
 1. demo.py를 실행합니다.
 2. dataset에 있는 이미지파일의 경로를 붙여넣기 합니다.
@@ -7,7 +7,6 @@ ___
 4. 폴더 dataset 에는 각각 down, front, left, right, up 방향에서 찍은 사진이 있습니다.
 5. 데모영상 링크 : https://youtu.be/pv_NXVsvo54
 ___
-<<<<<<< HEAD
 
 [주의사항]  
 > 온전한 gif파일을 얻기위해서는 코드 실행전에 for_gif 폴더를 제거해야합니다.  
