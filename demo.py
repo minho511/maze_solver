@@ -7,11 +7,13 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from collections import deque
 import time 
+
 # 이미지를 복사하여 터미널에서 붙여넣기하면 경로가 복사됨
 imgPath = input("이미지의 경로를 입력 >> ").rstrip()
-# imgPath = "./dataset/d/mazed1.png"
+# imgPath = "dataset/front/front_maze1.png"
 img = cv2.imread(imgPath)
 
+##### 사각형의 네 꼭짓점을 검출하기 위해 사용 ####
 def order_points(pts):
 
     rect = np.zeros((4, 2), dtype = "float32")
@@ -26,6 +28,7 @@ def order_points(pts):
     
     return rect
     
+##### 영상을 투시변환함 ######    
 def transform(img, pts):
     
     rect = order_points(pts)
@@ -49,6 +52,7 @@ def transform(img, pts):
     warped = cv2.warpPerspective(img, M, (maxWidth, maxHeight))
     return warped
 
+####### 영상에서 사각형의 윤곽선을 검출하고 원본에 윤곽선을 그린 영상과, 윤곽선 정보를 사용하여 투시변환을 수행한 연산을 반환 ######
 def sq_detect(image):
     origin = image.copy()
     gray = cv2.cvtColor(origin, cv2.COLOR_BGR2GRAY) # gray scale로 변환
@@ -74,6 +78,7 @@ def sq_detect(image):
 
 a4_contour, a4_warp = sq_detect(img)
 
+######영상의 테두리를 일부 잘라낸 결과를 반환######
 # 에이포 용지의 윤곽선이 남기도 하여 잘라냄
 def cut_edge(image):
     return image[20:-20,20:-20,:]
@@ -92,6 +97,7 @@ cv2.destroyAllWindows()
 cv2.imshow('maze_warp', maze_warp)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
+
 
 def find_widest_region(mat):
     '''
@@ -167,13 +173,14 @@ def find_point(image):
 
 start, end, maze_erased = find_point(maze_warp)
 
-# 미로 사진을 이진화 한다.
+###### 미로 사진을 이진화하는 함수 ######
 def binary_inv(maze_erased):
     maze_gray = cv2.cvtColor(maze_erased, cv2.COLOR_BGR2GRAY)
     T = threshold_local(maze_gray, 11, offset = 10, method = "gaussian")
     maze_bin = (maze_gray<= T).astype("uint8")*255
     return maze_bin
 
+##### gif형식으로 결과를 저장하기 위해 사용 ######
 def mkgif():
     path = [f"./for_mkgif/{i}" for i in os.listdir("./for_mkgif")]
     for idx, p in enumerate(path):
@@ -183,6 +190,7 @@ def mkgif():
     paths = [ Image.open(i) for i in path]
     imageio.mimsave('./result.gif', paths, fps=20)
 
+##### 미로 길 탐색을 위한 함수 #####
 def maze_solver(dila, start_point, end_point, maze_warp):
     t = time.time()
     map = np.zeros_like(dila, np.float32)
