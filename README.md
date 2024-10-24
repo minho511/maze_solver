@@ -6,6 +6,10 @@ ___
 3. 폴더 ori_maze : 20X20 미로의 원본 데이터입니다.
 4. 폴더 dataset 에는 각각 down, front, left, right, up 방향에서 찍은 사진이 있습니다.
 5. 데모영상 링크 : https://youtu.be/pv_NXVsvo54
+  
+  [![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/pv_NXVsvo54/0.jpg)](https://www.youtube.com/watch?v=pv_NXVsvo54)
+
+
 ___
 
 [주의사항]  
